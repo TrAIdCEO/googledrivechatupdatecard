@@ -83,7 +83,7 @@ exports.monitorBrainFaiRT = (0, scheduler_1.onSchedule)({
     try {
         const response = await driveactivity.activity.query({
             requestBody: {
-                ancestorName: `items/${sharedDriveId.value()}`,
+                ancestorName: `items/${sharedDriveId.value().trim()}`,
                 filter: `time >= "${new Date(Date.now() - 5 * 60 * 1000).toISOString()}"`,
             },
         });
@@ -151,7 +151,7 @@ exports.monitorBrainFaiRT = (0, scheduler_1.onSchedule)({
                         }
                     ]
                 };
-                await axios_1.default.post(chatWebhookUrl.value(), card);
+                await axios_1.default.post(chatWebhookUrl.value().trim(), card);
             }
         }
     }

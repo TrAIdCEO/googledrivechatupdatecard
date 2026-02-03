@@ -53,7 +53,7 @@ export const monitorBrainFaiRT = onSchedule({
   try {
     const response = await driveactivity.activity.query({
       requestBody: {
-        ancestorName: `items/${sharedDriveId.value()}`,
+        ancestorName: `items/${sharedDriveId.value().trim()}`,
         filter: `time >= "${new Date(Date.now() - 5 * 60 * 1000).toISOString()}"`,
       },
     });
@@ -126,7 +126,7 @@ export const monitorBrainFaiRT = onSchedule({
           ]
         };
 
-        await axios.post(chatWebhookUrl.value(), card);
+        await axios.post(chatWebhookUrl.value().trim(), card);
       }
     }
   } catch (error) {
