@@ -67,7 +67,7 @@ typings/
 # Next.js build output
 .next/
 out/
-next-env.d.ts*
+next-env.d.ts
 
 # Production build output
 dist/
