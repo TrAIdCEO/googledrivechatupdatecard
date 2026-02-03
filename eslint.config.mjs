@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "functions/lib/**", // Ignore the compiled functions output
   ]),
 ]);
 
