@@ -5,7 +5,7 @@ export function generateChatCard(activity: any, actionType: string, actorEmail: 
                 cardId: `card-${activity.timestamp || Date.now()}`,
                 card: {
                     header: {
-                        title: "BrainFaiRT Monitor",
+                        title: "google-chat Monitor",
                         subtitle: `Action: ${actionType.toUpperCase()}`,
                     },
                     sections: [

@@ -1,10 +1,10 @@
-# BrainFaiRT Monitor: Headless Event-Driven Service
+# google-chat Monitor: Headless Event-Driven Service
 
 STATUS: WIP / BROKEN. Saved mid-development due to cloud migration.
 
 ## Overview
 
-BrainFaiRT Monitor is a secure, headless Firebase Cloud Function (Node.js v22) architected to act as an integration layer between Google Workspace and Google Chat. It monitors a designated Google Shared Drive for actionable events (creations, edits, moves, deletions) and broadcasts these events to a Google Chat space via a strictly formatted `cardsV2` webhook payload.
+google-chat Monitor is a secure, headless Firebase Cloud Function (Node.js v22) architected to act as an integration layer between Google Workspace and Google Chat. It monitors a designated Google Shared Drive for actionable events (creations, edits, moves, deletions) and broadcasts these events to a Google Chat space via a strictly formatted `cardsV2` webhook payload.
 
 Built with strict MLOps and DevSecOps standards, this service operates entirely server-side, utilizing keyless authentication and structured logging.
 
@@ -38,7 +38,7 @@ Clone the repository and install the backend dependencies. **Note:** This is a s
 
 ```bash
 git clone <repository_url>
-cd brainfairt/functions
+cd google-chat/functions
 npm install
 ```
 
@@ -86,10 +86,10 @@ firebase emulators:start --only functions
 
 ### 5. Deploy to Production
 
-Deploy the function to Firebase. Once deployed, Google Cloud Scheduler will automatically trigger the `monitorBrainFaiRT` function every 5 minutes asynchronously.
+Deploy the function to Firebase. Once deployed, Google Cloud Scheduler will automatically trigger the `monitorgoogle-chat` function every 5 minutes asynchronously.
 
 ```bash
-firebase deploy --only functions:monitorBrainFaiRT
+firebase deploy --only functions:monitorgoogle-chat
 ```
 
 Monitor your live structured telemetry in the [Firebase Functions Logs Console](https://console.firebase.google.com/project/_/functions/logs).

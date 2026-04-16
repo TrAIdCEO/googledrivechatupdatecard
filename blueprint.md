@@ -1,7 +1,7 @@
 # Project Blueprint
 
 ## Overview
-BrainFaiRT is a headless event-driven service deployed as a Firebase Cloud Function (Node.js v2). It acts as an integration layer between Google Workspace and Google Chat.
+google-chat is a headless event-driven service deployed as a Firebase Cloud Function (Node.js v2). It acts as an integration layer between Google Workspace and Google Chat.
 
 Its primary function is to securely monitor a Google Shared Drive for activities (like file creations, edits, deletions, or moves) and broadcast these events as structured Google Chat Cards to a designated space via webhooks.
 

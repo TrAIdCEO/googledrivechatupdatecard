@@ -8,7 +8,7 @@ function generateChatCard(activity, actionType, actorEmail, fileName, fileUrl) {
                 cardId: `card-${activity.timestamp || Date.now()}`,
                 card: {
                     header: {
-                        title: "BrainFaiRT Monitor",
+                        title: "google-chat Monitor",
                         subtitle: `Action: ${actionType.toUpperCase()}`,
                     },
                     sections: [

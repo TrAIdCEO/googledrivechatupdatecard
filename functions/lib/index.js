@@ -33,7 +33,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.monitorBrainFaiRT = void 0;
+exports.monitorgoogle-chat = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
@@ -66,7 +66,7 @@ async function resolveEmail(personName, auth) {
         return "Unknown Email";
     }
 }
-exports.monitorBrainFaiRT = (0, scheduler_1.onSchedule)({
+exports.monitorgoogle-chat = (0, scheduler_1.onSchedule)({
     schedule: "every 5 minutes",
     secrets: [chatWebhookUrl, sharedDriveIdSecret],
 }, async (event) => {

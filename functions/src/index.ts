@@ -34,7 +34,7 @@ async function resolveEmail(personName: string, auth: any): Promise<string> {
     }
 }
 
-export const monitorBrainFaiRT = onSchedule({
+export const monitorgoogle-chat = onSchedule({
     schedule: "every 5 minutes",
     secrets: [chatWebhookUrl, sharedDriveIdSecret],
 }, async (event) => {
