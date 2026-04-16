@@ -32,131 +32,126 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.monitorBrainFaiRT = void 0;
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const params_1 = require("firebase-functions/params");
 const googleapis_1 = require("googleapis");
-const axios_1 = __importDefault(require("axios"));
+const logger = __importStar(require("firebase-functions/logger"));
+const cardBuilder_1 = require("./cardBuilder");
 admin.initializeApp();
+const db = admin.firestore();
 const chatWebhookUrl = (0, params_1.defineSecret)("CHAT_WEBHOOK_URL");
-const sharedDriveId = (0, params_1.defineSecret)("SHARED_DRIVE_ID");
-const personCache = new Map();
-async function getEmailFromPersonName(personName) {
+const sharedDriveIdSecret = (0, params_1.defineSecret)("SHARED_DRIVE_ID");
+// Simple local cache for email resolution during the execution loop
+const emailCache = {};
+async function resolveEmail(personName, auth) {
     var _a, _b;
-    if (personCache.has(personName)) {
-        return personCache.get(personName);
+    if (emailCache[personName]) {
+        return emailCache[personName];
     }
-    const auth = new googleapis_1.google.auth.GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/drive.activity.readonly", "https://www.googleapis.com/auth/people.readonly"],
-    });
     const people = googleapis_1.google.people({ version: "v1", auth });
     try {
-        const response = (await people.people.get({
+        const res = await people.people.get({
             resourceName: personName,
             personFields: "emailAddresses",
-        })).data;
-        const email = (_b = (_a = response.emailAddresses) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value;
-        if (email) {
-            personCache.set(personName, email);
-            return email;
+        });
+        const email = ((_b = (_a = res.data.emailAddresses) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.value) || "Unknown Email";
+        emailCache[personName] = email;
+        return email;
+    }
+    catch (error) {
+        logger.error(`Failed to resolve email for ${personName}`, error);
+        return "Unknown Email";
+    }
+}
+exports.monitorBrainFaiRT = (0, scheduler_1.onSchedule)({
+    schedule: "every 5 minutes",
+    secrets: [chatWebhookUrl, sharedDriveIdSecret],
+}, async (event) => {
+    var _a, _b, _c, _d, _e;
+    // Capture the start time of this execution to save as the next checkpoint
+    const executionStartTime = Date.now();
+    // Keyless Authentication: Automatically uses Application Default Credentials (ADC)
+    // The function assumes the identity of its attached Service Account.
+    const auth = new googleapis_1.google.auth.GoogleAuth({
+        scopes: [
+            "https://www.googleapis.com/auth/drive.activity.readonly",
+            "https://www.googleapis.com/auth/people.readonly"
+        ],
+    });
+    const driveactivity = googleapis_1.google.driveactivity({ version: "v2", auth });
+    const sharedDriveId = sharedDriveIdSecret.value().trim();
+    // Retrieve the last successful run time from Firestore
+    const metadataRef = db.collection('system_metadata').doc('monitor_state');
+    let lastRunTime;
+    try {
+        const doc = await metadataRef.get();
+        if (doc.exists && ((_a = doc.data()) === null || _a === void 0 ? void 0 : _a.lastRunTime)) {
+            lastRunTime = doc.data().lastRunTime;
+            logger.info(`Loaded last run time: ${new Date(lastRunTime).toISOString()}`);
+        }
+        else {
+            // Fallback: 5 minutes ago if no state exists
+            lastRunTime = executionStartTime - 5 * 60 * 1000;
+            logger.info(`No previous run time found. Defaulting to 5 minutes ago: ${new Date(lastRunTime).toISOString()}`);
         }
     }
     catch (error) {
-        console.error("Error fetching email:", error);
+        logger.error("Failed to retrieve last run time from Firestore", error);
+        // Fallback to avoid breaking execution
+        lastRunTime = executionStartTime - 5 * 60 * 1000;
     }
-    return "Unknown";
-}
-exports.monitorBrainFaiRT = (0, scheduler_1.onSchedule)({
-    schedule: "*/5 * * * *",
-    secrets: [chatWebhookUrl, sharedDriveId],
-}, async () => {
-    var _a, _b, _c, _d, _e, _f, _g;
-    const auth = new googleapis_1.google.auth.GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/drive.activity.readonly"],
-    });
-    const driveactivity = googleapis_1.google.driveactivity({ version: "v2", auth });
     try {
         const response = await driveactivity.activity.query({
             requestBody: {
-                ancestorName: `items/${sharedDriveId.value().trim()}`,
-                filter: `time >= "${new Date(Date.now() - 5 * 60 * 1000).toISOString()}"`,
+                ancestorName: `items/${sharedDriveId}`,
+                filter: `time > ${lastRunTime}`,
             },
         });
-        const activities = response.data.activities;
-        if (activities) {
-            for (const activity of activities) {
-                if (!activity.primaryActionDetail || activity.primaryActionDetail.comment) {
-                    continue;
-                }
-                const personName = (_d = (_c = (_b = (_a = activity.actors) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.user) === null || _c === void 0 ? void 0 : _c.knownUser) === null || _d === void 0 ? void 0 : _d.personName;
-                const actorEmail = personName ? await getEmailFromPersonName(personName) : "Unknown Actor";
-                const driveItem = (_f = (_e = activity.targets) === null || _e === void 0 ? void 0 : _e[0]) === null || _f === void 0 ? void 0 : _f.driveItem;
-                const fileId = (_g = driveItem === null || driveItem === void 0 ? void 0 : driveItem.name) === null || _g === void 0 ? void 0 : _g.substring(driveItem.name.lastIndexOf('/') + 1);
-                const card = {
-                    "cardsV2": [
-                        {
-                            "cardId": "unique-card-id",
-                            "card": {
-                                "header": {
-                                    "title": "BrainFaiRT Activity",
-                                    "imageUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/2295px-Google_Drive_icon_%282020%29.svg.png",
-                                    "imageType": "CIRCLE"
-                                },
-                                "sections": [
-                                    {
-                                        "header": "File Change Detected",
-                                        "collapsible": true,
-                                        "widgets": [
-                                            {
-                                                "decoratedText": {
-                                                    "topLabel": "File Name",
-                                                    "text": driveItem === null || driveItem === void 0 ? void 0 : driveItem.title,
-                                                }
-                                            },
-                                            {
-                                                "decoratedText": {
-                                                    "topLabel": "Actor Email",
-                                                    "text": actorEmail,
-                                                }
-                                            },
-                                            {
-                                                "decoratedText": {
-                                                    "topLabel": "Action Type",
-                                                    "text": Object.keys(activity.primaryActionDetail)[0],
-                                                }
-                                            },
-                                            {
-                                                "buttonList": {
-                                                    "buttons": [
-                                                        {
-                                                            "text": "Open File",
-                                                            "onClick": {
-                                                                "openLink": {
-                                                                    "url": `https://drive.google.com/file/d/${fileId}`
-                                                                }
-                                                            }
-                                                        }
-                                                    ]
-                                                }
-                                            }
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                };
-                await axios_1.default.post(chatWebhookUrl.value().trim(), card);
+        const activities = response.data.activities || [];
+        logger.info(`Found ${activities.length} activities since ${new Date(lastRunTime).toISOString()}`);
+        const webhookUrl = chatWebhookUrl.value().trim();
+        for (const activity of activities) {
+            const actionDetail = activity.primaryActionDetail;
+            // Ignore view or comment actions. The ActionDetail interface requires using Object.keys to check for specific action types.
+            if (!actionDetail)
+                continue;
+            const actionType = Object.keys(actionDetail)[0];
+            if (actionType === 'view' || actionType === 'comment') {
+                continue;
             }
+            // Extract Actor details & Resolve Identity
+            const actor = (_b = activity.actors) === null || _b === void 0 ? void 0 : _b[0];
+            const personName = (_d = (_c = actor === null || actor === void 0 ? void 0 : actor.user) === null || _c === void 0 ? void 0 : _c.knownUser) === null || _d === void 0 ? void 0 : _d.personName;
+            let actorEmail = "Unknown User";
+            if (personName) {
+                actorEmail = await resolveEmail(personName, auth);
+            }
+            // Extract Target details
+            const target = (_e = activity.targets) === null || _e === void 0 ? void 0 : _e[0];
+            const driveItem = target === null || target === void 0 ? void 0 : target.driveItem;
+            const fileName = (driveItem === null || driveItem === void 0 ? void 0 : driveItem.title) || "Unknown File";
+            const itemName = driveItem === null || driveItem === void 0 ? void 0 : driveItem.name; // Format is typically 'items/FILE_ID'
+            const fileId = itemName ? itemName.replace("items/", "") : "";
+            const fileUrl = fileId ? `https://drive.google.com/file/d/${fileId}/view` : "https://drive.google.com";
+            // Output Formatting: Google Chat CardV2 via helper
+            const cardMessage = (0, cardBuilder_1.generateChatCard)(activity, actionType, actorEmail, fileName, fileUrl);
+            // Notification: Send POST request to Google Chat Webhook URL
+            await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(cardMessage),
+            });
+            logger.info(`Processed activity for file: ${fileName}, action: ${actionType}`);
         }
+        // Save the new checkpoint time to Firestore only after successful execution
+        await metadataRef.set({ lastRunTime: executionStartTime });
+        logger.info(`Updated last run time to: ${new Date(executionStartTime).toISOString()}`);
     }
     catch (error) {
-        console.error("Error fetching drive activity:", error);
+        logger.error("Error monitoring Drive Activity", error);
     }
 });
 //# sourceMappingURL=index.js.map

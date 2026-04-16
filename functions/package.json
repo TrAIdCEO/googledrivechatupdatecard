@@ -8,21 +8,27 @@
     "shell": "firebase functions:shell",
     "start": "npm run shell",
     "deploy": "firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "logs": "firebase functions:log",
+    "lint": "eslint --ext .ts,.tsx ."
   },
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "dependencies": {
-    "axios": "^1.6.7",
+    "axios": "^1.13.6",
     "firebase": "^12.8.0",
-    "firebase-admin": "^13.6.0",
-    "firebase-functions": "^7.0.5",
+    "firebase-admin": "^13.7.0",
+    "firebase-functions": "^7.0.6",
     "google-auth-library": "^9.0.0",
     "googleapis": "^131.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20.8.10",
-    "typescript": "^5.0.0"
+    "@types/axios": "^0.9.36",
+    "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.1.0",
+    "@typescript-eslint/parser": "^7.1.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.56.1"
   }
 }

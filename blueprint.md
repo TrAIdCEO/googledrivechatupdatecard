@@ -1,31 +1,28 @@
 # Project Blueprint
 
 ## Overview
-This project is a Next.js application integrated with Firebase, utilizing the App Router structure. It includes Cloud Functions for backend logic, specifically monitoring Google Drive activity.
+BrainFaiRT is a headless event-driven service deployed as a Firebase Cloud Function (Node.js v2). It acts as an integration layer between Google Workspace and Google Chat.
 
-## Security Constraints
-- **Authentication**: Must use Application Default Credentials (ADC) via `google-auth-library` or `googleapis`. **Do NOT use JSON key files.** The function relies on its own managed service account identity.
+Its primary function is to securely monitor a Google Shared Drive for activities (like file creations, edits, deletions, or moves) and broadcast these events as structured Google Chat Cards to a designated space via webhooks.
 
-## Project Outline
-- **Framework**: Next.js (App Router)
-- **Styling**: Tailwind CSS
-- **Backend/Services**: Firebase (Analytics, AI, Cloud Functions, Secrets Manager, Cloud Build, Artifact Registry)
-- **Environment**: Firebase Studio
+## Architecture & Features
 
-## Recent Changes
-- **Security**: Explicitly documented and verified ADC usage for Cloud Functions.
-- **Cloud Functions**:
-    -   Refactored `monitorBrainFaiRT` to use Firebase Secrets (`CHAT_WEBHOOK_URL`, `SHARED_DRIVE_ID`).
-    -   Updated `functions/tsconfig.json` to CommonJS.
-    -   Updated `functions/package.json` to specify `node: 20` engine.
-- **IAM Permissions**:
-    -   Added `roles/storage.objectViewer` to default compute service account.
-    -   Added `roles/artifactregistry.writer` to default compute service account.
+### Current State:
+* **Framework:** Firebase Cloud Functions v2 (`firebase-functions/v2`) running Node.js.
+* **Architecture:** Headless, API-First, Event-driven. (All frontend UI/Next.js/React elements have been stripped out).
+* **Core Logic:** `functions/src/index.ts`
+* **Trigger:** Scheduled CRON job (`onSchedule`) running every 5 minutes.
+* **Authentication Strategy:** Secure Keyless Authentication using Google Application Default Credentials (ADC). The function relies entirely on its attached Service Account for permissions to interact with Google APIs rather than using static JSON keys.
+* **Data Retrieval:** Uses the `googleapis` package to query `driveactivity.v2` filtering by the Shared Drive ID and a time window determined by the last successful execution time.
+* **State Management:** Uses Firebase Firestore to persist the timestamp of the last successful run (`system_metadata/monitor_state`). This ensures no events are missed due to execution latency or function cold starts.
+* **Identity Resolution:** Uses `people.v1` API to map opaque Google `personName` identifiers to readable user email addresses. Implements a fast in-memory object cache to eliminate redundant API calls within the execution loop.
+* **Filtering:** Explicitly ignores non-actionable events, specifically `view` and `comment` action types.
+* **Notification Mechanism:** Sends POST requests to a Google Chat Webhook using native `fetch`. Payload is strictly formatted to the Google Chat `cardsV2` specification.
+* **Logging:** Utilizes the official `firebase-functions/logger` for structured MLOps-compliant logging instead of `console.log`.
+* **Secrets Management:** Integrates with Firebase Secret Manager via `defineSecret` to securely retrieve `CHAT_WEBHOOK_URL` and `SHARED_DRIVE_ID` at runtime. Hardcoded secrets are explicitly avoided.
 
-## Current Plan: Fix Analytics Type Error
-The error `Argument of type 'Analytics | null' is not assignable to parameter of type 'Analytics'` occurs because `firebaseModule.analytics` can be `null` (as defined in `src/lib/firebase.ts`), but `logEvent` expects a non-null `Analytics` instance.
-
-### Steps
-1.  **Update `src/app/page.tsx`**:
-    -   Store `firebaseModule.analytics` in a local variable to ensure type narrowing works correctly.
-    -   Or assert non-nullability inside the `if` block.
+### Development Standards & Security:
+* Ensure all development is strictly server-side. Do not install or run client-side frameworks.
+* Maintain Strict TypeScript definitions for payloads and API schemas where possible.
+* Webhook endpoints or API routes exposed via `onRequest` (if implemented in the future) MUST NOT be exposed publicly without robust authorization logic (e.g., verifying API keys or checking Identity tokens) to prevent abuse.
+* Ensure IAM roles assigned to the function's service account follow the Principle of Least Privilege (e.g., granting exactly `Drive Activity Viewer`, `People API Reader`, and `Firestore User`, nothing more).
